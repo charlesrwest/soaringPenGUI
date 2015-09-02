@@ -3,6 +3,8 @@
 
 #include "exampleHeaderFile.hpp"
 
+#include <board.h>
+
 TEST_CASE("Example test case", "[Example]")
 {
 SECTION("Example section", "[Example]")
@@ -18,6 +20,8 @@ REQUIRE(testString == "ABC");
 REQUIRE((testInt + testDouble) == Approx(15.0));
 
 REQUIRE(thisFunctionConvertsToInt(5.9) == 5);
+
+aruco::Board aBoard;
 }
 }
 

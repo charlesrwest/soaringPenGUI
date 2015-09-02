@@ -18,9 +18,9 @@ endif(DOXYGEN_FOUND)
 ADD_DEFINITIONS(-std=c++11)
 
 #Tell compiler where to find required libraries
-link_directories(/usr/lib/x86_64-linux-gnu/)
+link_directories(/usr/lib/x86_64-linux-gnu/ /usr/local/lib/)
 
-include_directories(./src/library/ ./src/executables/unitTests )
+include_directories(./src/library/ ./src/executables/unitTests /usr/local/include/aruco/)
 
 find_package(Threads)
 
@@ -43,7 +43,7 @@ add_library(soaringPen SHARED  ${SOURCEFILES})
 #Tell CMake what executables to make
 ADD_EXECUTABLE(unitTests ${UNIT_TESTS_EXECUTABLE_SOURCE}) 
 
-target_link_libraries(soaringPen dl ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(soaringPen dl ${CMAKE_THREAD_LIBS_INIT} opencv_core opencv_highgui opencv_calib3d aruco)
 
 #link libraries to executable
 target_link_libraries(unitTests soaringPen)
