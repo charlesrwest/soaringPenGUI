@@ -9,6 +9,8 @@ CTestTestfile.cmake
 *.so
 Makefile
 moc_*
+*_automoc*
+ui_*.h
 /bin/*
 /doc/*
 Doxyfile
