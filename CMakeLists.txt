@@ -23,30 +23,38 @@ set(CMAKE_AUTOMOC ON)
 #Get c++11
 ADD_DEFINITIONS(-std=c++11)
 
+find_package(Protobuf REQUIRED)
+
+#Generate the C++ for the messages from the libprotobuf markup
+add_subdirectory(./messages)
+
 #Tell compiler where to find required libraries
 link_directories(/usr/lib/x86_64-linux-gnu/ /usr/local/lib/)
 
-include_directories(src/library/ src/executables/unitTests /usr/local/include/aruco/ src/executables/simpleTagTracker src/executables/simpleMarkerTracker src/executables/testVideoPublisher src/executables/testVideoSubscriber automoc)
+include_directories(src/library/ src/executables/unitTests /usr/local/include/aruco/ src/executables/simpleTagTracker src/executables/simpleMarkerTracker src/executables/testVideoPublisher src/executables/testVideoSubscriber src/executables/userInterface src/executables/controller automoc messages)
 
 find_package(Threads)
 
 #Get lists of the source files
 FILE(GLOB SOURCEFILES src/library/*.cpp src/library/*.c automoc/*.cpp automoc/*.c)
 
-FILE(GLOB FORM_FILES ./src/library/*.ui)
+FILE(GLOB FORM_FILES src/library/*.ui)
 
-FILE(GLOB LIBRARY_HEADER_FILES ./src/library/*.hpp ./src/library/*.h ${QT_USE_FILE} ${QT_HEADERS})
+FILE(GLOB LIBRARY_HEADER_FILES src/library/*.hpp src/library/*.h ${QT_USE_FILE} ${QT_HEADERS})
 
-FILE(GLOB UNIT_TESTS_EXECUTABLE_SOURCE ./src/executables/unitTests/*.cpp ./src/executables/unitTests/*.c)
+FILE(GLOB UNIT_TESTS_EXECUTABLE_SOURCE src/executables/unitTests/*.cpp src/executables/unitTests/*.c)
 
-FILE(GLOB SIMPLE_TAG_TRACKER_EXECUTABLE_SOURCE ./src/executables/simpleTagTracker/*.cpp ./src/executables/simpleTagTracker/*.c)
+FILE(GLOB SIMPLE_TAG_TRACKER_EXECUTABLE_SOURCE src/executables/simpleTagTracker/*.cpp src/executables/simpleTagTracker/*.c)
 
-FILE(GLOB SIMPLE_MARKER_TRACKER_EXECUTABLE_SOURCE ./src/executables/simpleMarkerTracker/*.cpp ./src/executables/simpleMarkerTracker/*.c)
+FILE(GLOB SIMPLE_MARKER_TRACKER_EXECUTABLE_SOURCE src/executables/simpleMarkerTracker/*.cpp src/executables/simpleMarkerTracker/*.c)
 
-FILE(GLOB TEST_VIDEO_PUBLISHER_EXECUTABLE_SOURCE ./src/executables/testVideoPublisher/*.cpp ./src/executables/testVideoPublisher/*.c)
+FILE(GLOB TEST_VIDEO_PUBLISHER_EXECUTABLE_SOURCE src/executables/testVideoPublisher/*.cpp src/executables/testVideoPublisher/*.c)
 
-FILE(GLOB TEST_VIDEO_SUBSCRIBER_EXECUTABLE_SOURCE ./src/executables/testVideoSubscriber/*.cpp ./src/executables/testVideoSubscriber/*.c)
+FILE(GLOB TEST_VIDEO_SUBSCRIBER_EXECUTABLE_SOURCE src/executables/testVideoSubscriber/*.cpp src/executables/testVideoSubscriber/*.c)
 
+FILE(GLOB USER_INTERFACE_EXECUTABLE_SOURCE src/executables/userInterface/*.cpp src/executables/userInterface/*.c)
+
+FILE(GLOB CONTROLLER_EXECUTABLE_SOURCE src/executables/controller/*.cpp src/controller/userInterface/*.c)
 
 #Add the QT modules we are going to use
 #QT_USE_QTNETWORK QT_USE_QTOPENGL QT_USE_QTSQL QT_USE_QTXML QT_USE_QTSVG QT_USE_QTTEST QT_USE_QTDBUS QT_USE_QTSCRIPT QT_USE_QTWEBKIT QT_USE_QTXMLPATTERNS QT_USE_PHONON
@@ -84,7 +92,12 @@ ADD_EXECUTABLE(testVideoPublisher  ${TEST_VIDEO_PUBLISHER_EXECUTABLE_SOURCE})
 
 ADD_EXECUTABLE(testVideoSubscriber  ${TEST_VIDEO_SUBSCRIBER_EXECUTABLE_SOURCE}) 
 
-target_link_libraries(soaringPen dl ${CMAKE_THREAD_LIBS_INIT} opencv_core opencv_highgui opencv_calib3d aruco Qt5::Widgets)
+ADD_EXECUTABLE(userInterface  ${USER_INTERFACE_EXECUTABLE_SOURCE}) 
+
+ADD_EXECUTABLE(controller  ${CONTROLLER_EXECUTABLE_SOURCE}) 
+
+
+target_link_libraries(soaringPen dl ${CMAKE_THREAD_LIBS_INIT} opencv_core opencv_highgui opencv_calib3d aruco Qt5::Widgets soaringPenMessages zmq ${PROTOBUF_LIBRARY})
 
 #link libraries to executable
 target_link_libraries(unitTests soaringPen)
@@ -93,8 +106,12 @@ target_link_libraries(simpleTagTracker soaringPen)
 
 target_link_libraries(simpleMarkerTracker soaringPen)
 
-target_link_libraries(testVideoPublisher soaringPen zmq)
+target_link_libraries(testVideoPublisher soaringPen)
 
-target_link_libraries(testVideoSubscriber soaringPen zmq)
+target_link_libraries(testVideoSubscriber soaringPen)
+
+target_link_libraries(userInterface soaringPen)
+
+target_link_libraries(controller soaringPen)
 
 

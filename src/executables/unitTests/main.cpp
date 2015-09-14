@@ -25,3 +25,12 @@ aruco::Board aBoard;
 }
 }
 
+TEST_CASE("Test float/int conversion", "[float/int]")
+{
+SECTION("Float/Int conversion")
+{
+float testFloat = -.8;
+REQUIRE(std::to_string(*((int32_t *) &testFloat)) == "-1085485875");
+}
+
+}
