@@ -13,10 +13,16 @@
 #include<QMouseEvent>
 #include "fPoint.hpp"
 #include "linearPath.hpp"
+#include<cmath>
+#include "controller_status_update.pb.h"
 
 
 namespace soaringPen
 {
+
+const double IMAGE_PATH_MARGIN = .07; //The offset from the edges of the camera image that the path is allowed to have in relative coordinates
+
+const int TRAVELLED_PATH_WIDTH = 1000;
 
 class userInterface : public QMainWindow, public Ui::userInterfaceWindow
 {
@@ -56,6 +62,18 @@ This function receives a video frame and overlays the current path (and any othe
 */
 void overlayVideoFrame(const QPixmap &inputVideoFrame);
 
+/**
+When activated, this slot emits the followPathCommandSignal to send the current path to the drone.  If the current path has a length of 1 or less, no signal is emitted.
+*/
+void emitFollowPathCommandSignal();
+
+/**
+Process the status update to get the drone position so that the green field path can be updated.
+@param inputStatusUpdate: The status update to process
+
+@throws: This function can throw exceptions
+*/
+void processStatusUpdateForFieldPath(const controller_status_update &inputStatusUpdate);
 
 signals:
 /**
@@ -63,11 +81,17 @@ This signal is any received video frame with the current path overlayed on it.
 */
 void videoFrameWithOverlay(QPixmap);
 
+/**
+This signal is a follow path command for the drone to perform.
+*/
+void followPathCommandSignal(follow_path_command);
+
 
 private:
 fPoint cameraImageSize;
 bool currentlyDrawingPath = false;
 linearPath path; //The path to travel/draw
+linearPath droneTravelledPath; //The path where the drone has actually gone
 
 
 /**

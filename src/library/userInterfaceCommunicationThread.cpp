@@ -12,6 +12,8 @@ This function initializes the processManagerThread.
 */
 userInterfaceCommunicationThread::userInterfaceCommunicationThread(zmq::socket_t &inputCommandSocket, zmq::socket_t &inputVideoSubscriberSocket, QObject *inputParent) : commandSocket(inputCommandSocket), videoSubscriberSocket(inputVideoSubscriberSocket), QThread(inputParent)
 {
+qRegisterMetaType<controller_status_update>("controller_status_update");
+
 this->moveToThread(this);
 
 //connect(this, SIGNAL(rosCoreStatusChanged(bool)), this, SLOT(handleNodesChanges(bool)));
@@ -25,6 +27,62 @@ userInterfaceCommunicationThread::~userInterfaceCommunicationThread()
 quit(); //Tell thread event loop to exit
 wait(); //Wait for thread to exit
 }
+
+/**
+This function sends a follow path command to the ardrone controller.
+@param inputFollowPathCommand: The path to follow (0 length paths are ignored)
+
+@throw: This function can throw exceptions
+*/
+void userInterfaceCommunicationThread::sendFollowPathCommand(follow_path_command inputFollowPathCommand)
+{
+if(inputFollowPathCommand.path_x_coordinates_size() == 0 || inputFollowPathCommand.path_y_coordinates_size() == 0)
+{
+return;
+}
+
+//Intitialize command
+gui_command command;
+(*command.mutable_follow_path_command_field()) = inputFollowPathCommand;
+
+SOM_TRY
+pylongps::sendProtobufMessage(commandSocket, command);
+SOM_CATCH("Error sending follow path command\n");
+}
+
+/**
+This function sends a return to home command message to the AR drone controller.
+@throw: This function can throw exceptions 
+*/
+void userInterfaceCommunicationThread::sendReturnToHomeCommand()
+{
+//Intitialize command
+gui_command command;
+command.set_return_to_home(true);
+
+SOM_TRY
+pylongps::sendProtobufMessage(commandSocket, command);
+SOM_CATCH("Error sending follow path command\n");
+}
+
+/**
+This function sends a signal to activate the emergency stop message to the AR drone controller.
+@throw: This function can throw exceptions 
+*/
+void userInterfaceCommunicationThread::sendEmergencyStopCommand()
+{
+//Intitialize command
+emergency_stop_command stopCommand;
+stopCommand.set_stop(true);
+
+gui_command command;
+(*command.mutable_emergency_stop_command_field()) = stopCommand;
+
+SOM_TRY
+pylongps::sendProtobufMessage(commandSocket, command);
+SOM_CATCH("Error sending follow path command\n");
+}
+
 
 /*
 This function is the code that is run in the seperate thread.  It is responsible for managing the processes and emitting signals via an event loop.
@@ -60,6 +118,9 @@ SOM_CATCH("Error polling\n")
 if(pollItems[0].revents & ZMQ_POLLIN)
 {
 //Process status update
+SOM_TRY
+convertStatusUpdateMessageToSignals();
+SOM_CATCH("Error updating and emitting signal\n")
 }
 
 //Check if a new video frame has been received
@@ -108,6 +169,56 @@ SOM_CATCH("Error receiving video stream message")
 SOM_TRY
 emit cameraImage(convertJPegToQPixMap((char *) messageBuffer->data(), messageBuffer->size()));
 SOM_CATCH("Error converting/emitting video frame\n")
+}
+
+}
+
+/**
+This function receives any messages waiting on commandSocket and emits the associated signals for display.
+
+@throw: This function can throw exceptions
+*/
+void userInterfaceCommunicationThread::convertStatusUpdateMessageToSignals()
+{
+while(true)
+{ //Process all queued messages
+//Receive message
+std::unique_ptr<zmq::message_t> messageBuffer;
+
+
+SOM_TRY
+messageBuffer.reset(new zmq::message_t);
+SOM_CATCH("Error initializing ZMQ message")
+
+SOM_TRY //Receive message
+if(commandSocket.recv(messageBuffer.get(), ZMQ_DONTWAIT) != true)
+{
+return; //No message to be had
+}
+SOM_CATCH("Error receiving status update message")
+
+bool messageReceived = false;
+bool messageDeserialized = false;
+controller_status_update statusUpdate;
+SOM_TRY //Receive/deserialize message
+std::tie(messageReceived, messageDeserialized) = pylongps::receiveProtobufMessage(commandSocket, statusUpdate, ZMQ_DONTWAIT);
+SOM_CATCH("Error receiving status update message")
+
+if(!messageReceived || !messageDeserialized)
+{ //Something when wrong with getting the message, so return
+return; 
+}
+
+//Update moving average
+velocityMovingAverage = .8*fPoint(statusUpdate.x_velocity(), statusUpdate.y_velocity())+.2*velocityMovingAverage;
+
+
+SOM_TRY //Emit defaults if the optional fields are not present
+emit controllerStatusUpdate(statusUpdate);
+emit droneBatteryStatus(statusUpdate.battery_status());
+emit droneXVelocity(((int) velocityMovingAverage.val[0])/100.0);
+emit droneYVelocity(((int) velocityMovingAverage.val[1])/100.0);
+SOM_CATCH("Error converting/emitting signals\n")
 }
 
 }

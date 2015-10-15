@@ -13,6 +13,8 @@ This function initializes the user interface and starts the communication thread
 */
 userInterface::userInterface(zmq::context_t &inputContext, const std::string &inputControllerPairInterfaceURI, const std::string &inputControllerVideoPublishingURI)
 {
+qRegisterMetaType<follow_path_command>("follow_path_command");
+qRegisterMetaType<controller_status_update>("controller_status_update");
 
 //Make window
 setupUi(this);
@@ -51,7 +53,24 @@ SOM_CATCH("Error starting communication thread\n")
 
 connect(communicationThread.get(), SIGNAL(cameraImage(QPixmap)), this, SLOT(overlayVideoFrame(const QPixmap &)));
 
+connect(communicationThread.get(), SIGNAL(controllerStatusUpdate(controller_status_update)), this, SLOT(processStatusUpdateForFieldPath(const controller_status_update &)));
+
 connect(this, SIGNAL(videoFrameWithOverlay(QPixmap)), videoDisplayLabel, SLOT(setPixmap(const QPixmap &)));
+
+connect(startFlightPushButton, SIGNAL(clicked(bool)), this, SLOT(emitFollowPathCommandSignal()));
+
+connect(this, SIGNAL(followPathCommandSignal(follow_path_command)), communicationThread.get(), SLOT(sendFollowPathCommand(follow_path_command)));
+
+connect(cancelFlightPushButton, SIGNAL(clicked(bool)), communicationThread.get(), SLOT(sendReturnToHomeCommand()));
+
+connect(emergencyStopPushButton, SIGNAL(clicked(bool)), communicationThread.get(), SLOT(sendEmergencyStopCommand()));
+
+
+
+//Connect status labels for updates
+connect(communicationThread.get(), SIGNAL(droneBatteryStatus(double)), chargePercentLabel, SLOT(setNum(double)));
+connect(communicationThread.get(), SIGNAL(droneXVelocity(double)), xVelocityLabel, SLOT(setNum(double)));
+connect(communicationThread.get(), SIGNAL(droneYVelocity(double)), yVelocityLabel, SLOT(setNum(double)));
 
 //Register to receive events that occur in the video display label
 videoDisplayLabel->installEventFilter(this);
@@ -88,10 +107,7 @@ cameraImageSize = fPoint(buffer.width(), buffer.height());
 //Draw stuff
 QPainter painter(&buffer);
 
-QPen penSettings = painter.pen();
-penSettings.setWidth(3);
 
-painter.setPen(penSettings);
 
 //Convert path to scaled picture coordinates
 std::vector<std::pair<int, int> > convertedPath;
@@ -100,12 +116,43 @@ for(auto iter = path.points.begin(); iter != path.points.end(); iter++)
 convertedPath.push_back(normalizedImageCoordinateToImageCoordinate((*iter).val[0], (*iter).val[1]));
 }
 
+{ //Draw travelled field
+QPen penSettings = painter.pen();
+penSettings.setWidth(TRAVELLED_PATH_WIDTH*cameraImageSize.mag()/10000);
+penSettings.setColor(QColor(0,255,0,40));
+
+painter.setPen(penSettings);
+
+std::vector<std::pair<int, int> > convertedTravelledPath;
+for(auto iter = droneTravelledPath.points.begin(); iter != droneTravelledPath.points.end(); iter++)
+{
+convertedTravelledPath.push_back(normalizedImageCoordinateToImageCoordinate((*iter).val[0], (*iter).val[1]));
+}
+
+//Draw path with linear interpolation
+for(int i=1; i<convertedTravelledPath.size(); i++)
+{
+painter.drawLine(convertedTravelledPath[i-1].first+.5, convertedTravelledPath[i-1].second+.5, convertedTravelledPath[i].first+.5, convertedTravelledPath[i].second+.5);
+}
+
+}
+
+{
+QPen penSettings = painter.pen();
+penSettings.setWidth(3*cameraImageSize.mag()/1000);
+penSettings.setColor(QColor(0,0,0,255));
+
+painter.setPen(penSettings);
+
 //Draw path with linear interpolation
 for(int i=1; i<convertedPath.size(); i++)
 {
 painter.drawLine(convertedPath[i-1].first+.5, convertedPath[i-1].second+.5, convertedPath[i].first+.5, convertedPath[i].second+.5);
 }
 
+}
+
+/*
 //TODO: Remove
 static double pathLocation = 0.01;
 if(currentlyDrawingPath || pathLocation > path.pathLength)
@@ -120,11 +167,51 @@ auto convertedPointToDraw = normalizedImageCoordinateToImageCoordinate(pointToDr
 painter.drawEllipse(convertedPointToDraw.first-5, convertedPointToDraw.second-5, 10,10);
 pathLocation += .01;
 }
+*/
 
 //printf("Path size: %ld\n", convertedPath.size());
 
 emit videoFrameWithOverlay(buffer);
 }
+
+/**
+When activated, this slot emits the followPathCommandSignal to send the current path to the drone.  If the current path has a length of 1 or less, no signal is emitted.
+*/
+void userInterface::emitFollowPathCommandSignal()
+{
+if(path.points.size() < 2)
+{ //Path is too short, ignore command
+return;
+}
+
+//Compose a follow path command
+follow_path_command command;
+
+for(auto iter = path.points.begin(); iter != path.points.end(); iter++)
+{
+command.add_path_x_coordinates(iter->val[0]);
+command.add_path_y_coordinates(iter->val[1]);
+}
+
+//Emit it
+emit followPathCommandSignal(command);
+}
+
+/**
+Process the status update to get the drone position so that the green field path can be updated.
+@param inputStatusUpdate: The status update to process
+
+@throws: This function can throw exceptions
+*/
+void userInterface::processStatusUpdateForFieldPath(const controller_status_update &inputStatusUpdate)
+{
+//Add drone location
+droneTravelledPath.addPoint(fPoint(inputStatusUpdate.x_position(), inputStatusUpdate.y_position()));
+
+//Remove points that are too close together
+droneTravelledPath.regularize(.03);
+}
+
 
 /**
 This function makes it possible for the main window to handle events that happen in it's widgets.  It is called when an event registered via installEventFilter happens in the registered object.
@@ -140,6 +227,7 @@ if(inputEvent->type() == QEvent::MouseButtonPress)
 {
 currentlyDrawingPath = true;
 path.clear(); //Erase old path, start new one
+droneTravelledPath.clear();
 }
 
 if(inputEvent->type() == QEvent::MouseButtonRelease)
@@ -150,16 +238,27 @@ currentlyDrawingPath = false; //Path completed
 if(inputEvent->type() == QEvent::MouseMove)
 {
 QMouseEvent *mouseMoveEvent = static_cast<QMouseEvent*>(inputEvent);
+
+
 std::pair<double, double> normalizedMousePosition = videoDisplayLabelCoordinateToNormalizedImageCoordinate(mouseMoveEvent->x(), mouseMoveEvent->y());
-path.addPoint(fPoint(normalizedMousePosition.first, normalizedMousePosition.second));
+
+fPoint normalizedMousePositionPoint(normalizedMousePosition.first, normalizedMousePosition.second);
+
+for(int i=0; i<2; i++)
+{
+normalizedMousePositionPoint.val[i] = fmax(normalizedMousePositionPoint.val[i], -.5*cameraImageSize.val[i]/cameraImageSize.mag()+IMAGE_PATH_MARGIN);
+normalizedMousePositionPoint.val[i] = fmin(normalizedMousePositionPoint.val[i], .5*cameraImageSize.val[i]/cameraImageSize.mag()-IMAGE_PATH_MARGIN);
+}
+
+path.addPoint(normalizedMousePositionPoint);
 
 //Smooth line by removing short segments
-//path.regularize(.03);
-path.regularize(.1);
+path.regularize(.01);
+//path.regularize(.1);
 
 
 //Limit path length
-path.truncate(4.0);
+path.truncate(1.5);
 }
 
 }

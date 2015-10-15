@@ -11,6 +11,13 @@
 #include<QPixmap>
 #include<QImage>
 #include<cstdio>
+#include "utilityFunctions.hpp"
+#include "fPoint.hpp"
+
+#include "gui_command.pb.h"
+#include "follow_path_command.pb.h"
+#include "emergency_stop_command.pb.h"
+#include "controller_status_update.pb.h"
 
 namespace soaringPen
 {
@@ -44,6 +51,25 @@ zmq::socket_t &videoSubscriberSocket;
 bool shutdown = false; //Flag to indicate thread should shutdown
 
 public slots:
+/**
+This function sends a follow path command to the ardrone controller.
+@param inputFollowPathCommand: The path to follow (0 length paths are ignored)
+
+@throw: This function can throw exceptions
+*/
+void sendFollowPathCommand(follow_path_command inputFollowPathCommand);
+
+/**
+This function sends a return to home command message to the AR drone controller.
+@throw: This function can throw exceptions 
+*/
+void sendReturnToHomeCommand();
+
+/**
+This function sends a signal to activate the emergency stop message to the AR drone controller.
+@throw: This function can throw exceptions 
+*/
+void sendEmergencyStopCommand();
 
 signals:
 /**
@@ -51,7 +77,29 @@ This signal emits an image to display as part of the video stream from the contr
 */
 void cameraImage(QPixmap);
 
+/**
+This signal emits the current battery percentage of the drone's battery.
+*/
+void droneBatteryStatus(double);
+
+/**
+This signal emits the drone's current X velocity when it receives an update.
+*/
+void droneXVelocity(double);
+
+/**
+This signal emits the drone's current Y velocity when it receives an update.
+*/
+void droneYVelocity(double);
+
+/**
+Emits the status updates associated with the controller's updates.
+*/
+void controllerStatusUpdate(controller_status_update);
+
 protected:
+fPoint velocityMovingAverage;
+
 /*
 This function is the code that is run in the seperate thread.  It is responsible for managing the processes and emitting signals via an event loop.
 */
@@ -63,6 +111,14 @@ This function receives any messages waiting on videoSubscriberSocket and attempt
 @throws: This function can throw exceptions
 */
 void convertVideoFrameMessageToSignal();
+
+/**
+This function receives any messages waiting on commandSocket and emits the associated signals for display.
+
+@throw: This function can throw exceptions
+*/
+void convertStatusUpdateMessageToSignals();
+
 };
 
 
