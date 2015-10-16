@@ -30,7 +30,7 @@ SOM_CATCH("Error, unable to initialize user interface\n")
 myUserInterface->show();
 
 //Set to cover screen
-//myUserInterface->showFullScreen();
+myUserInterface->showFullScreen();
 
 
 

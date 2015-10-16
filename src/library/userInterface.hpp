@@ -20,7 +20,9 @@
 namespace soaringPen
 {
 
-const double IMAGE_PATH_MARGIN = .07; //The offset from the edges of the camera image that the path is allowed to have in relative coordinates
+const double IMAGE_PATH_MARGIN = .09; //The offset from the edges of the camera image that the path is allowed to have in relative coordinates
+const double IMAGE_PATH_X_OFFSET = -.02;
+const double IMAGE_PATH_Y_OFFSET = .02;
 
 const int TRAVELLED_PATH_WIDTH = 1000;
 

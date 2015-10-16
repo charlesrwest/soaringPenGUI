@@ -119,7 +119,7 @@ convertedPath.push_back(normalizedImageCoordinateToImageCoordinate((*iter).val[0
 { //Draw travelled field
 QPen penSettings = painter.pen();
 penSettings.setWidth(TRAVELLED_PATH_WIDTH*cameraImageSize.mag()/10000);
-penSettings.setColor(QColor(0,255,0,40));
+penSettings.setColor(QColor(0,255,0,20));
 
 painter.setPen(penSettings);
 
@@ -244,11 +244,14 @@ std::pair<double, double> normalizedMousePosition = videoDisplayLabelCoordinateT
 
 fPoint normalizedMousePositionPoint(normalizedMousePosition.first, normalizedMousePosition.second);
 
-for(int i=0; i<2; i++)
-{
-normalizedMousePositionPoint.val[i] = fmax(normalizedMousePositionPoint.val[i], -.5*cameraImageSize.val[i]/cameraImageSize.mag()+IMAGE_PATH_MARGIN);
-normalizedMousePositionPoint.val[i] = fmin(normalizedMousePositionPoint.val[i], .5*cameraImageSize.val[i]/cameraImageSize.mag()-IMAGE_PATH_MARGIN);
-}
+//X
+normalizedMousePositionPoint.val[0] = fmax(normalizedMousePositionPoint.val[0], -.5*cameraImageSize.val[0]/cameraImageSize.mag()+IMAGE_PATH_MARGIN+IMAGE_PATH_X_OFFSET);
+normalizedMousePositionPoint.val[0] = fmin(normalizedMousePositionPoint.val[0], .5*cameraImageSize.val[0]/cameraImageSize.mag()-IMAGE_PATH_MARGIN+IMAGE_PATH_X_OFFSET);
+
+//Y
+normalizedMousePositionPoint.val[1] = fmax(normalizedMousePositionPoint.val[1], -.5*cameraImageSize.val[1]/cameraImageSize.mag()+IMAGE_PATH_MARGIN+IMAGE_PATH_Y_OFFSET);
+normalizedMousePositionPoint.val[1] = fmin(normalizedMousePositionPoint.val[1], .5*cameraImageSize.val[1]/cameraImageSize.mag()-IMAGE_PATH_MARGIN+IMAGE_PATH_Y_OFFSET);
+
 
 path.addPoint(normalizedMousePositionPoint);
 
