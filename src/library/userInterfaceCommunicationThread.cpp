@@ -190,19 +190,29 @@ SOM_TRY
 messageBuffer.reset(new zmq::message_t);
 SOM_CATCH("Error initializing ZMQ message")
 
+/* THIS CAUSED AN ERROR and was not suppose to be here
 SOM_TRY //Receive message
 if(commandSocket.recv(messageBuffer.get(), ZMQ_DONTWAIT) != true)
 {
 return; //No message to be had
 }
 SOM_CATCH("Error receiving status update message")
+*/
+
 
 bool messageReceived = false;
 bool messageDeserialized = false;
 controller_status_update statusUpdate;
+try
+{
 SOM_TRY //Receive/deserialize message
 std::tie(messageReceived, messageDeserialized) = pylongps::receiveProtobufMessage(commandSocket, statusUpdate, ZMQ_DONTWAIT);
 SOM_CATCH("Error receiving status update message")
+}
+catch(const std::exception &inputException)
+{
+fprintf(stderr, "Error: %s\n", inputException.what());
+}
 
 if(!messageReceived || !messageDeserialized)
 { //Something when wrong with getting the message, so return
@@ -219,6 +229,7 @@ emit droneBatteryStatus(statusUpdate.battery_status());
 emit droneXVelocity(((int) velocityMovingAverage.val[0])/100.0);
 emit droneYVelocity(((int) velocityMovingAverage.val[1])/100.0);
 SOM_CATCH("Error converting/emitting signals\n")
+printf("Emitted data\n");
 }
 
 }

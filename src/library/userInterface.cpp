@@ -169,7 +169,7 @@ pathLocation += .01;
 }
 */
 
-//printf("Path size: %ld\n", convertedPath.size());
+printf("Path size: %ld\n", convertedPath.size());
 
 emit videoFrameWithOverlay(buffer);
 }
@@ -210,6 +210,8 @@ droneTravelledPath.addPoint(fPoint(inputStatusUpdate.x_position(), inputStatusUp
 
 //Remove points that are too close together
 droneTravelledPath.regularize(.03);
+
+printf("Hello world\n");
 }
 
 
